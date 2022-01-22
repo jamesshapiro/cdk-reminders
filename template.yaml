@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  reminders
+
+  Sample SAM Template for reminders app
+
+Globals:
+  Function:
+    MemorySize: 128
+    Timeout: 60
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Description: Recipient e-mail address
+  NotificationPhone:
+    Type: String
+    Description: Recipient phone number
+
+Resources:
+  CreateReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/reminder-app-code/
+      Handler: create_reminder.lambda_handler
+      Runtime: python3.8
+      # TODO: narrow this
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref RemindersDDBTable
+      Layers:
+        - !Ref ULIDLayer
+      Environment:
+        Variables:
+          REMINDERS_DDB_TABLE: !Ref RemindersDDBTable
+      Events:
+        CreateReminderAPIWithKeyRequired:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CreateReminderApi
+            Path: /remind/
+            Method: post
+            Auth:
+              ApiKeyRequired: true
+
+  CreateReminderApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        ApiKeyRequired: true
+
+  CreateReminderApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Enabled: true
+
+  CreateReminderUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: 'CreateReminderApiProdStage'
+    Properties:
+      ApiStages:
+        - ApiId: !Ref CreateReminderApi
+          Stage: 'Prod'
+
+  CreateReminderUsagePlanKeyAssocation:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref CreateReminderApiKey
+      KeyType: 'API_KEY'
+      UsagePlanId: !Ref CreateReminderUsagePlan
+
+  SendRemindersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/reminder-app-code/
+      Handler: send_reminders.lambda_handler
+      Runtime: python3.8
+      # TODO: narrow this
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RemindersDDBTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt RemindersTopic.TopicName
+        - AmazonSNSFullAccess
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt RemindersTopic.TopicName
+      Layers:
+        - !Ref ULIDLayer
+      Environment:
+        Variables:
+          REMINDERS_DDB_TABLE: !Ref RemindersDDBTable
+          REMINDERS_TOPIC: !Ref RemindersTopic
+          REMINDERS_PHONE_NUMBER: !Ref NotificationPhone
+      Events:
+        CheckForReminders:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+
+  CreateReminderFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ''
+          - - /aws/lambda/
+            - Ref: CreateReminderFunction
+
+  RemindersDDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: 'PK1'
+          AttributeType: 'S'
+        - AttributeName: 'SK1'
+          AttributeType: 'S'
+      BillingMode: 'PAY_PER_REQUEST'
+      # ContributorInsightsSpecification:
+      #   Enabled: true
+      KeySchema:
+        - AttributeName: 'PK1'
+          KeyType: 'HASH'
+        - AttributeName: 'SK1'
+          KeyType: 'RANGE'
+
+  ULIDLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: ULIDLayer
+      Description: Reminder Dependencies
+      ContentUri: src/
+      CompatibleRuntimes:
+        - python3.7
+        - python3.8
+      LicenseInfo: MIT
+      RetentionPolicy: Retain
+
+  RemindersTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref NotificationEmail
+        #- Protocol: sms
+        #  Endpoint: !Ref NotificationPhone
+  #######################################################
+  ##### Start of Custom functions #####
+  #######################################################
+  ValueFuncExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: '/'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: apigateway:GET
+                Resource: !Sub arn:aws:apigateway:${AWS::Region}::/apikeys/${CreateReminderApiKey}
+
+  ValueFunc:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+
+          def lambda_handler(event, context):
+            response_code = 200
+            api_gateway_client = boto3.client('apigateway')
+            api_key_id = event['ResourceProperties']['ApiKeyID']
+            response = api_gateway_client.get_api_key(
+              apiKey=api_key_id,
+              includeValue=True
+            )
+            responseValue = response['value']
+            responseData = {}
+            responseData['Data'] = responseValue
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "CustomResourcePhysicalID", noEcho=True)
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Timeout: 30
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ValueFuncExecutionRole}'
+  GetApiKeyValue:
+    Type: Custom::LambdaCallout
+    Properties:
+      ServiceToken: !GetAtt ValueFunc.Arn
+      ApiKeyID: !Ref CreateReminderApiKey
+
+Outputs:
+  ULIDLayer:
+    Value: !Ref ULIDLayer
+    Description: ARN For AWS ULIDLayer
+  ReminderApi:
+    Description: 'API Gateway endpoint URL for Prod stage for Reminder function'
+    Value: !Sub 'https://${CreateReminderApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/remind/'
+  APIKeyValue:
+    Description: 'The actual API Key Value'
+    Value: !GetAtt GetApiKeyValue.Data
