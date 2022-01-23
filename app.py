@@ -7,7 +7,7 @@ from cdk_reminders.cdk_reminders_stack import CdkRemindersAppStack
 
 
 app = cdk.App()
-CdkRemindersAppStack(app, "CdkRemindersAppStack",
+CdkRemindersAppStack(app, "CdkReminders",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.

@@ -77,16 +77,17 @@ def get_midnight(timezone):
     midnight = maya.when('-'.join(map(str,[year, month, day])), timezone=timezone)
     return midnight
 
-def upload_reminder(time, reminder, url, readable):
+def upload_reminder(time, reminder, api_key, url, readable):
     payload = {
         'reminder': reminder,
         'time': time,
         'readable_reminder_time': readable
     }
-    #headers = {
-    #    'x-api-key': api_key
-    #}
-    headers = {}
+    print(f'{api_key=}')
+    headers = {
+        'x-api-key': api_key
+    }
+    print(f'{url=}')
     #response = requests.post(url, data=json.dumps(payload))
     response = requests.post(url, data=json.dumps(payload), headers=headers)
     json_response = json.loads(response.text)
@@ -179,7 +180,7 @@ def repeat_reminder(time, reminder):
         upload_reminder(print_time, reminder, password, url, str(readable_timestamp(print_time)))
 
 def get_default_stack_id():
-    return 'CdkRemindersAppStack'
+    return 'CdkReminders'
 
 def get_client_credentials():
     cloudformation = boto3.resource('cloudformation')
@@ -189,19 +190,23 @@ def get_client_credentials():
         stack_id = default_stack_id
     stack = cloudformation.Stack(stack_id)
     outputs = stack.outputs
-    api_gateway_output = outputs[0]
+    api_gateway_output = [output for output in outputs if output['OutputKey'] == 'ReminderApi'][0]
     url = api_gateway_output['OutputValue']
+    #url =  f'https://{api_id}.execute-api.us-east-1.amazonaws.com/prod/'
+    api_key_output = [
+        output for output in outputs if output['OutputKey'] == 'APIKeyValue'][0]
+    api_key = api_key_output['OutputValue']
     timezone = 'US/Eastern'
-    return url, timezone
+    return url, api_key, timezone
 
         
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Reminders 0.1')
-    url, timezone = get_client_credentials()
+    url, api_key, timezone = get_client_credentials()
     reminder = arguments['REMINDER']
     midnight = get_midnight(timezone)
     time = parse_time(arguments['TIME'], midnight)
     print_time = int(time._epoch)
-    upload_reminder(print_time, reminder, url, str(readable_timestamp(print_time)))
+    upload_reminder(print_time, reminder, api_key, url, str(readable_timestamp(print_time)))
     if arguments['--repeat']:
         repeat_reminder(time, reminder)
