@@ -83,7 +83,6 @@ def upload_reminder(time, reminder, api_key, url, readable):
         'time': time,
         'readable_reminder_time': readable
     }
-    print(f'{api_key=}')
     headers = {
         'x-api-key': api_key
     }

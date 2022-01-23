@@ -74,7 +74,6 @@ class CdkRemindersAppStack(Stack):
         api = apigateway.RestApi(
             self,
             "reminders-api-cdk",
-            rest_api_name="reminders-api-cdk",
             description="Reminder service in CDK."
         )
 
@@ -107,22 +106,6 @@ class CdkRemindersAppStack(Stack):
         ddb_table.grant_write_data(reminder_creator_function_cdk)
         ddb_table.grant_read_write_data(reminder_sender_function_cdk)
 
-        # custom_resources_role = iam.Role(self, "Role",
-        #     assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-        #     description="Example role..."
-        # )
-
-        #api_key.grant_read(custom_resources_role)
-
-        # do_nothing_function = lambda_.Function(
-        #     self, "RemindersCDKDoNothing",
-        #     runtime=lambda_.Runtime.PYTHON_3_8,
-        #     code=lambda_.Code.from_asset("resources"),
-        #     handler="do_nothing.lambda_handler",
-        #     timeout=cdk.Duration.seconds(30),
-        #     memory_size=128,
-        # )
-
         with open('resources/custom_resource.py') as f:
             is_complete_code = f.read()
 
@@ -132,13 +115,11 @@ class CdkRemindersAppStack(Stack):
                 runtime=lambda_.Runtime.PYTHON_3_8,
                 code=lambda_.Code.from_inline(is_complete_code),
                 handler="index.lambda_handler",
-                log_retention=logs.RetentionDays.ONE_DAY,
                 environment=dict(
                     API_KEY_ID=api_key.key_id,
                 ),
                 timeout=cdk.Duration.seconds(30),
-                memory_size=128,
-                #role=custom_resources_role
+                memory_size=128
             )
 
         api_key.grant_read(is_complete_handler)
@@ -146,9 +127,7 @@ class CdkRemindersAppStack(Stack):
         my_provider = custom_resources.Provider(
             self, "MyProvider",
             on_event_handler=is_complete_handler,
-            is_complete_handler=is_complete_handler,
-            #timeout=cdk.Duration.minutes(30),
-            #total_timeout=cdk.Duration.minutes(30)
+            is_complete_handler=is_complete_handler
         )
 
         custom_resource = cdk.CustomResource(
@@ -170,17 +149,3 @@ class CdkRemindersAppStack(Stack):
             description="Reminder Api",
             value = f'https://{api.rest_api_id}.execute-api.us-east-1.amazonaws.com/prod/'
         )
-
-        
-
-        # my_provider = custom_resources.Provider(self, "MyProvider",
-        #     on_event_handler=on_event,
-        #     log_retention=logs.RetentionDays.ONE_DAY,  # default is INFINITE
-        #     role=custom_resources_role
-        # )
-
-        # resource = MyCustomResource(
-        #     self, "MyCustomResource",
-        #     api_key_arn=api_key.key_arn,
-        #     api_key_id=api_key.key_id
-        # )
