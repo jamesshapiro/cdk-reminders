@@ -1,15 +1,3 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: >
-  reminders
-
-  Sample SAM Template for reminders app
-
-Globals:
-  Function:
-    MemorySize: 128
-    Timeout: 60
-
 Parameters:
   NotificationEmail:
     Type: String
@@ -19,31 +7,6 @@ Parameters:
     Description: Recipient phone number
 
 Resources:
-  CreateReminderFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/reminder-app-code/
-      Handler: create_reminder.lambda_handler
-      Runtime: python3.8
-      # TODO: narrow this
-      Policies:
-        - DynamoDBWritePolicy:
-            TableName: !Ref RemindersDDBTable
-      Layers:
-        - !Ref ULIDLayer
-      Environment:
-        Variables:
-          REMINDERS_DDB_TABLE: !Ref RemindersDDBTable
-      Events:
-        CreateReminderAPIWithKeyRequired:
-          Type: Api
-          Properties:
-            RestApiId: !Ref CreateReminderApi
-            Path: /remind/
-            Method: post
-            Auth:
-              ApiKeyRequired: true
-
   CreateReminderApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -70,72 +33,6 @@ Resources:
       KeyId: !Ref CreateReminderApiKey
       KeyType: 'API_KEY'
       UsagePlanId: !Ref CreateReminderUsagePlan
-
-  SendRemindersFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/reminder-app-code/
-      Handler: send_reminders.lambda_handler
-      Runtime: python3.8
-      # TODO: narrow this
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref RemindersDDBTable
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt RemindersTopic.TopicName
-        - AmazonSNSFullAccess
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt RemindersTopic.TopicName
-      Layers:
-        - !Ref ULIDLayer
-      Environment:
-        Variables:
-          REMINDERS_DDB_TABLE: !Ref RemindersDDBTable
-          REMINDERS_TOPIC: !Ref RemindersTopic
-          REMINDERS_PHONE_NUMBER: !Ref NotificationPhone
-      Events:
-        CheckForReminders:
-          Type: Schedule
-          Properties:
-            Schedule: rate(1 minute)
-
-  CreateReminderFunctionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ''
-          - - /aws/lambda/
-            - Ref: CreateReminderFunction
-
-  RemindersDDBTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      AttributeDefinitions:
-        - AttributeName: 'PK1'
-          AttributeType: 'S'
-        - AttributeName: 'SK1'
-          AttributeType: 'S'
-      BillingMode: 'PAY_PER_REQUEST'
-      # ContributorInsightsSpecification:
-      #   Enabled: true
-      KeySchema:
-        - AttributeName: 'PK1'
-          KeyType: 'HASH'
-        - AttributeName: 'SK1'
-          KeyType: 'RANGE'
-
-  ULIDLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: ULIDLayer
-      Description: Reminder Dependencies
-      ContentUri: src/
-      CompatibleRuntimes:
-        - python3.7
-        - python3.8
-      LicenseInfo: MIT
-      RetentionPolicy: Retain
 
   RemindersTopic:
     Type: AWS::SNS::Topic
