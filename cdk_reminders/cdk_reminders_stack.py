@@ -8,22 +8,23 @@ from aws_cdk import (
     aws_sns as sns,
     aws_sns_subscriptions as subscriptions,
     aws_iam as iam,
-    aws_logs as logs,
     custom_resources as custom_resources,
 )
 import aws_cdk as cdk
-import os
 
 from constructs import Construct
-
-phone_number = os.environ['NotificationPhone']
-email = os.environ['NotificationEmail']
 
 class CdkRemindersAppStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
+        with open(".cdk-params") as f:
+            lines = f.read().splitlines()
+            # .cdk-params should be of the form (note the required country code in phone #):
+            # NotificationPhone=+12223334444
+            # NotificationEmail=jeff@example.com
+            phone_number = [line for line in lines if line.startswith('NotificationPhone')][0].split('=')[1]
+            email = [line for line in lines if line.startswith('NotificationEmail')][0].split('=')[1]
         ddb_table = dynamodb.Table(
             self, "Table",
             partition_key=dynamodb.Attribute(name="PK1", type=dynamodb.AttributeType.STRING),

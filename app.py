@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
 import os
+import jsii
 
 import aws_cdk as cdk
 
+from aws_cdk import (
+    Aspects,
+    CfnResource,
+)
+
 from cdk_reminders.cdk_reminders_stack import CdkRemindersAppStack
 
+@jsii.implements(cdk.IAspect)
+class ForceDeletion:
+    def visit(self, scope):
+        if isinstance(scope, CfnResource):
+            scope.apply_removal_policy(cdk.RemovalPolicy.DESTROY)
 
 app = cdk.App()
-CdkRemindersAppStack(app, "CdkReminders",
+my_stack = CdkRemindersAppStack(app, "CdkReminders",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.
@@ -24,5 +35,7 @@ CdkRemindersAppStack(app, "CdkReminders",
 
     # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
     )
+
+Aspects.of(my_stack).add(ForceDeletion())
 
 app.synth()
