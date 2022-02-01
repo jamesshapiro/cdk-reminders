@@ -18,7 +18,7 @@ class ForceDeletion:
             scope.apply_removal_policy(cdk.RemovalPolicy.DESTROY)
 
 app = cdk.App()
-my_stack = CdkRemindersAppStack(app, "CdkReminders",
+my_stack = CdkRemindersAppStack(app, "CdkRemindersParam",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.

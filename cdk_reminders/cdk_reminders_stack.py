@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_sns_subscriptions as subscriptions,
     aws_iam as iam,
     custom_resources as custom_resources,
+    CfnParameter,
 )
 import aws_cdk as cdk
 
@@ -18,13 +19,16 @@ class CdkRemindersAppStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        with open(".cdk-params") as f:
-            lines = f.read().splitlines()
-            # .cdk-params should be of the form (note the required country code in phone #):
-            # NotificationPhone=+12223334444
-            # NotificationEmail=jeff@example.com
-            phone_number = [line for line in lines if line.startswith('NotificationPhone')][0].split('=')[1]
-            email = [line for line in lines if line.startswith('NotificationEmail')][0].split('=')[1]
+        # with open(".cdk-params") as f:
+        #     lines = f.read().splitlines()
+        #     # .cdk-params should be of the form (note the required country code in phone #):
+        #     # NotificationPhone=+12223334444
+        #     # NotificationEmail=jeff@example.com
+        #     phone_number = [line for line in lines if line.startswith('NotificationPhone')][0].split('=')[1]
+        #     email = [line for line in lines if line.startswith('NotificationEmail')][0].split('=')[1]
+        phone_number = CfnParameter(self, 'NotificationPhone', 
+            description="Phone number to receive reminders. For US numbers, should be of the form +12223334444 with +1 as the country code.")
+        email = CfnParameter(self,'NotificationEmail', description="Email to receive reminders.")
         ddb_table = dynamodb.Table(
             self, "Table",
             partition_key=dynamodb.Attribute(name="PK1", type=dynamodb.AttributeType.STRING),
@@ -60,13 +64,11 @@ class CdkRemindersAppStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_8,
             code=lambda_.Code.from_asset("resources"),
             handler="send_reminders.lambda_handler",
-            environment=dict(
-                REMINDERS_DDB_TABLE=ddb_table.table_name,
-                REMINDERS_TOPIC = topic.topic_arn,
-                # TODO: turn this into a formal parameter
-                REMINDERS_PHONE_NUMBER = phone_number
-                # TODO: turn this into a formal parameter
-            ),
+            environment={
+                "REMINDERS_DDB_TABLE": ddb_table.table_name,
+                "REMINDERS_TOPIC": topic.topic_arn,
+                "REMINDERS_PHONE_NUMBER": phone_number.value_as_string
+            },
             timeout=cdk.Duration.seconds(30),
             memory_size=128,
             layers=[ulid_layer]
@@ -92,8 +94,7 @@ class CdkRemindersAppStack(Stack):
 
         topic.grant_publish(reminder_sender_function_cdk)
         email_address = email
-        #my_topic.add_subscription(subscriptions.EmailSubscription(email_address.value_as_string))
-        topic.add_subscription(subscriptions.EmailSubscription(email_address))
+        topic.add_subscription(subscriptions.EmailSubscription(email_address.value_as_string))
         reminder_sender_function_cdk.role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSNSFullAccess"))
 
         api.root.add_method("POST", create_reminder_integration, api_key_required=True)

@@ -179,7 +179,7 @@ def repeat_reminder(time, reminder):
         upload_reminder(print_time, reminder, password, url, str(readable_timestamp(print_time)))
 
 def get_default_stack_id():
-    return 'CdkReminders'
+    return 'CdkRemindersParam'
 
 def get_client_credentials():
     cloudformation = boto3.resource('cloudformation')
