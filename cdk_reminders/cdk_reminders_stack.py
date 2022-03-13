@@ -192,17 +192,17 @@ class CdkRemindersAppStack(Stack):
         #     ]
         # )
 
-        
+        AUTHORIZER_FUNCTION_NAME = 'Authorizer'
         
         domain_names = [subdomain, f'www.{subdomain}']
-        authorizer_function = cloudfront.experimental.EdgeFunction(self, "Authorizer",
+        authorizer_function = cloudfront.experimental.EdgeFunction(self, AUTHORIZER_FUNCTION_NAME,
             runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.Code.from_asset('lambda_edge'),
             handler='authorizer.lambda_handler',
         )
         statement_1 = iam.PolicyStatement(
             actions=['iam:GetRole*','iam:ListRolePolicies'],
-            resources=[f'arn:aws:iam::{Aws.ACCOUNT_ID}:role/{Aws.STACK_NAME}-AuthorizerFnServiceRole*']
+            resources=[f'arn:aws:iam::{Aws.ACCOUNT_ID}:role/{Aws.STACK_NAME}-{AUTHORIZER_FUNCTION_NAME}FnServiceRole*']
         )
         statement_2 = iam.PolicyStatement(
             actions=['dynamodb:GetItem'],
