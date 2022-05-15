@@ -48,7 +48,7 @@ class CdkRemindersAppStack(Stack):
             self,
             "Ulid38Layer",
             removal_policy=cdk.RemovalPolicy.DESTROY,
-            code=lambda_.Code.from_asset('layers/my-Python38-ulid.zip'),
+            code=lambda_.Code.from_asset('layers/ulidpytz38.zip'),
             compatible_architectures=[lambda_.Architecture.X86_64]
         )
 

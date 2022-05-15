@@ -5,6 +5,7 @@ import time
 import boto3
 import os
 import ulid
+import pytz
 from base64 import b64decode
 
 bad_time_syntax = 'Bad time syntax. Usage: "reminder": "do laundry", "time": "12-18-2016-12:09am"'
@@ -61,13 +62,35 @@ def lambda_handler(event, context):
     table_name = os.environ['REMINDERS_DDB_TABLE']
 
     reminder_ulid = str(ulid.from_timestamp(unix_time))
-
+    item_ulid = ulid.from_str(reminder_ulid)
+    item_datetime = item_ulid.timestamp().datetime
+    EST = pytz.timezone('US/Eastern')
+    item_datetime_local = item_datetime.astimezone(EST)
+    month, day, year, hour, minute = [
+        f'{item_datetime_local.month:02d}',
+        f'{item_datetime_local.day:02d}',
+        item_datetime_local.year,
+        f'{item_datetime_local.hour:02d}',
+        f'{item_datetime_local.minute:02d}'
+    ]
+    am_pm = 'AM'
+    if hour == '00':
+        hour = '12'
+        if minute == '00':
+            am_pm = 'AM'
+    elif hour == '12' and minute == '00':
+        am_pm = 'PM'
+    elif int(hour) > 12:
+        hour = f'{int(hour)-12:02d}'
+        am_pm = 'PM'
+    datetime_str = f'{month}-{day}-{year}-{hour}:{minute}{am_pm}'
     response = dynamodb_client.put_item(
         TableName = table_name,
         Item={
             'PK1': {'S': 'REMINDER'},
             'SK1': {'S': reminder_ulid},
-            'reminder': {'S': reminder_content}
+            'reminder': {'S': reminder_content},
+            'datetime': {'S': datetime_str}
         }
     )
     
