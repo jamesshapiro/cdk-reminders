@@ -23,6 +23,7 @@ import re
 import requests
 import sys
 import boto3
+import os
 from docopt import docopt
 
 """
@@ -182,6 +183,11 @@ def get_default_stack_id():
     return 'CdkRemindersParam'
 
 def get_client_credentials():
+    timezone = 'US/Eastern'
+    if all(x in os.environ for x in ['REMINDERS_URL', 'REMINDERS_API_KEY']):
+        url = os.environ['REMINDERS_URL']
+        api_key = os.environ['REMINDERS_API_KEY']
+        return url, api_key, timezone
     cloudformation = boto3.resource('cloudformation')
     stack_id = ''  # input('stack id?: ')
     default_stack_id = get_default_stack_id()
@@ -195,7 +201,6 @@ def get_client_credentials():
     api_key_output = [
         output for output in outputs if output['OutputKey'] == 'APIKeyValue'][0]
     api_key = api_key_output['OutputValue']
-    timezone = 'US/Eastern'
     return url, api_key, timezone
 
         
