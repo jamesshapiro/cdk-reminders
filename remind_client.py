@@ -169,7 +169,7 @@ def get_increment():
         print('invalid repeat flag option')
         sys.exit(0)
 
-def repeat_reminder(time, reminder):
+def repeat_reminder(time, reminder, api_key):
     stop_date = james_date_to_epoch(arguments['--until'])
     stop_time = int(stop_date._epoch)
     print('stop date: ' + str(readable_timestamp(stop_time)))
@@ -177,7 +177,7 @@ def repeat_reminder(time, reminder):
     while int(time.add(**increment)._epoch) < stop_time:
         time = time.add(**increment)
         print_time = int(time._epoch)
-        upload_reminder(print_time, reminder, password, url, str(readable_timestamp(print_time)))
+        upload_reminder(print_time, reminder, api_key, url, str(readable_timestamp(print_time)))
 
 def get_default_stack_id():
     return 'CdkRemindersParam'
@@ -213,4 +213,4 @@ if __name__ == '__main__':
     print_time = int(time._epoch)
     upload_reminder(print_time, reminder, api_key, url, str(readable_timestamp(print_time)))
     if arguments['--repeat']:
-        repeat_reminder(time, reminder)
+        repeat_reminder(time, reminder, api_key)
